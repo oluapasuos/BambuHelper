@@ -1,0 +1,46 @@
+name: Build AMOLED 1.75 test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'hardware_tests/ws_amoled_175/**'
+      - '.github/workflows/build-ws-amoled-175-test.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PlatformIO and esptool
+        run: pip install platformio esptool
+
+      - name: Build test firmware
+        working-directory: hardware_tests/ws_amoled_175
+        run: pio run -e ws_amoled_175_test
+
+      - name: Prepare full flash image
+        working-directory: hardware_tests/ws_amoled_175
+        run: |
+          python -m esptool --chip esp32s3 merge_bin -o BambuHelper-WS-AMOLED-175-Test-Full.bin \
+            --flash_mode qio --flash_freq 80m --flash_size 16MB \
+            0x0000 .pio/build/ws_amoled_175_test/bootloader.bin \
+            0x8000 .pio/build/ws_amoled_175_test/partitions.bin \
+            0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
+            0x10000 .pio/build/ws_amoled_175_test/firmware.bin
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: ws-amoled-175-test-firmware
+          path: |
+            hardware_tests/ws_amoled_175/BambuHelper-WS-AMOLED-175-Test-Full.bin
+            hardware_tests/ws_amoled_175/.pio/build/ws_amoled_175_test/firmware.bin

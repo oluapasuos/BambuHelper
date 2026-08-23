@@ -440,7 +440,24 @@ public:
   }
 };
 static LGFX_WS154 _tft_instance;
+#elif defined(BOARD_IS_WS_AMOLED_175)
+// --- Waveshare ESP32-S3-Touch-AMOLED-1.75 (CO5300 466x466 QSPI) -------------
+#include "lgfx_panel_co5300_agfx.hpp"
 
+class LGFX_WS_AMOLED_175 : public lgfx::LGFX_Device {
+  lgfx::Panel_CO5300_AGFX _panel;
+
+public:
+  LGFX_WS_AMOLED_175() {
+    setPanel(&_panel);
+  }
+
+  lgfx::Panel_CO5300_AGFX* panelCO5300() {
+    return &_panel;
+  }
+};
+
+static LGFX_WS_AMOLED_175 _tft_instance;
 #elif defined(BOARD_IS_WS350)
 // --- Waveshare ESP32-S3-Touch-LCD-3.5 (3.5" ST7796 320x480 IPS) -------------
 // ST7796 over plain 4-wire SPI -> native LovyanGFX Panel_ST7796 (no Arduino_GFX

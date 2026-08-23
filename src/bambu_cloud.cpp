@@ -9,7 +9,7 @@
 
 // CA certificate bundle (shared with MQTT — linked from platformio build)
 extern const uint8_t rootca_crt_bundle_start[] asm("_binary_x509_crt_bundle_start");
-
+extern const uint8_t rootca_crt_bundle_end[] asm("_binary_x509_crt_bundle_end");
 // ---------------------------------------------------------------------------
 //  Region-aware URL helpers
 // ---------------------------------------------------------------------------
@@ -103,7 +103,10 @@ static int httpsRequest(const char* method, const char* url,
                                   // single-threaded web server down with it
 
   // First attempt: proper CA verification
-  tls->setCACertBundle(rootca_crt_bundle_start);
+  tls->setCACertBundle(
+    rootca_crt_bundle_start,
+    rootca_crt_bundle_end - rootca_crt_bundle_start
+);
   int httpCode = httpsRequestWith(*tls, method, url, body, authToken, response, cookie);
 
   if (httpCode == -1) {

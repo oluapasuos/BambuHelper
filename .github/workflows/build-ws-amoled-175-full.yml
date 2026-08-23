@@ -1,0 +1,41 @@
+name: Build BambuHelper for WS AMOLED 1.75
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ws-amoled-175-port-v2
+    paths:
+      - 'src/**'
+      - 'boards/ws_amoled_175.ini'
+      - 'platformio.ini'
+      - '.github/workflows/build-ws-amoled-175-full.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build BambuHelper
+        run: pio run -e ws_amoled_175
+
+      - name: Upload build files
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bambuhelper-ws-amoled-175-build
+          path: |
+            .pio/build/ws_amoled_175/firmware.bin
+            .pio/build/ws_amoled_175/bootloader.bin
+            .pio/build/ws_amoled_175/partitions.bin

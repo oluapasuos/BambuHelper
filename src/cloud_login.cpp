@@ -10,7 +10,7 @@
 #include <esp_task_wdt.h>
 
 extern const uint8_t rootca_crt_bundle_start[] asm("_binary_x509_crt_bundle_start");
-
+extern const uint8_t rootca_crt_bundle_end[] asm("_binary_x509_crt_bundle_end");
 // ---------------------------------------------------------------------------
 //  Session state
 // ---------------------------------------------------------------------------
@@ -157,7 +157,10 @@ static bool cloudRequest(const char* host, const char* path, const char* method,
   // tight - a healthy call here finishes in a second or two.
   tls->setTimeout(5);
   tls->setHandshakeTimeout(6);
-  tls->setCACertBundle(rootca_crt_bundle_start);
+  tls->setCACertBundle(
+    rootca_crt_bundle_start,
+    rootca_crt_bundle_end - rootca_crt_bundle_start
+);
 
   esp_task_wdt_reset();
   bool connected = tls->connect(host, 443);

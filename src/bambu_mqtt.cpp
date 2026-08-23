@@ -15,7 +15,7 @@
 
 // Built-in CA certificate bundle for cloud TLS verification
 extern const uint8_t rootca_crt_bundle_start[] asm("_binary_x509_crt_bundle_start");
-
+extern const uint8_t rootca_crt_bundle_end[] asm("_binary_x509_crt_bundle_end");
 // ── Per-connection context ──────────────────────────────────────────────────
 struct MqttConn {
   uint8_t slotIndex;
@@ -147,7 +147,10 @@ static bool ensureClients(MqttConn& c) {
   }
   if (isCloudMode(printers[c.slotIndex].config.mode)) {
     // Cloud: use built-in CA certificate bundle for proper TLS verification
-    c.tls->setCACertBundle(rootca_crt_bundle_start);
+    c.tls->setCACertBundle(
+    rootca_crt_bundle_start,
+    rootca_crt_bundle_end - rootca_crt_bundle_start
+);
     c.tls->setTimeout(15);
   } else {
     // LAN: printers use self-signed certs, skip verification

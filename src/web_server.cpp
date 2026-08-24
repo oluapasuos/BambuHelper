@@ -1,3 +1,4 @@
+#include <WiFi.h>
 #include "web_server.h"
 #include "web_template.h"
 #include "settings.h"

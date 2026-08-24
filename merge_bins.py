@@ -206,6 +206,8 @@ BOARD_ALIASES = {
     'ws_lcd_280': 'ws_lcd_280',
     'ws350': 'ws_lcd_350',
     'ws_lcd_350': 'ws_lcd_350',
+    'ws_amoled_175': 'ws_amoled_175',
+    'wsamoled175': 'ws_amoled_175',
     'jc': 'jc3248w535',
     'jc3248w535': 'jc3248w535',
     'sc01': 'wt32_sc01_plus',

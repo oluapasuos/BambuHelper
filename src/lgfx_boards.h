@@ -441,6 +441,8 @@ public:
 };
 static LGFX_WS154 _tft_instance;
 #elif defined(BOARD_IS_WS_AMOLED_175)
+#define PANEL_REQUIRES_CO5300_FRAME_SPRITE 1
+
 // --- Waveshare ESP32-S3-Touch-AMOLED-1.75 (CO5300 466x466 QSPI) -------------
 #include "lgfx_panel_co5300_agfx.hpp"
 

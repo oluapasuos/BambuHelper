@@ -53,6 +53,14 @@ BOARDS = {
         'build_env': 'esp32s3',
         'board_id': 'esp32s3',
     },
+        'ws_amoled_175': {
+        'build_dir': '.pio/build/ws_amoled_175',
+        'bootloader_offset': 0x0,
+        'partitions_offset': 0x8000,
+        'firmware_offset': 0x10000,
+        'build_env': 'ws_amoled_175',
+        'board_id': 'ws_amoled_175',
+    },
     'esp32s3_round': {
         'build_dir': '.pio/build/esp32s3_round',
         'bootloader_offset': 0x0,       # ESP32-S3 starts at 0x0

@@ -109,18 +109,18 @@ lgfx::LovyanGFX* tft_ptr = &_tft_instance;
 
 // Direct panel pointer for JC3248W535 sprite escape-hatch; nullptr on all
 // other boards so the extern declaration in display_ui.h is always satisfied.
-#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE)
-
+#if PANEL_REQUIRES_AXS_FRAME_SPRITE
 lgfx::Panel_AXS15231B_AGFX* g_axs_panel = _tft_instance.panelAXS();
+#else
+lgfx::Panel_AXS15231B_AGFX* g_axs_panel = nullptr;
+#endif
 
-#elif defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
-
+#if PANEL_REQUIRES_CO5300_FRAME_SPRITE
 lgfx::Panel_CO5300_AGFX* g_co5300_panel = _tft_instance.panelCO5300();
-
 #endif
 
 
-#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE) || defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+#if PANEL_REQUIRES_AXS_FRAME_SPRITE || PANEL_REQUIRES_CO5300_FRAME_SPRITE
 
 // Full-frame PSRAM sprite. BambuHelper draws here first,
 // then the complete frame is pushed to the Arduino_GFX panel.
@@ -133,13 +133,13 @@ static const unsigned long FRAME_KEEPALIVE_MS = 500;
 #endif
 
 void markFrameDirty() {
-#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE) || defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+#if PANEL_REQUIRES_AXS_FRAME_SPRITE || PANEL_REQUIRES_CO5300_FRAME_SPRITE
   g_frame_dirty = true;
 #endif
 }
 
 void flushFrame() {
-#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE) || defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+#if PANEL_REQUIRES_AXS_FRAME_SPRITE || PANEL_REQUIRES_CO5300_FRAME_SPRITE
     if (!_frame_sprite.getBuffer()) return;
 
     unsigned long now = millis();
@@ -147,7 +147,7 @@ void flushFrame() {
 
     if (!g_frame_dirty && !keepalive_due) return;
 
-#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE)
+#if PANEL_REQUIRES_AXS_FRAME_SPRITE
 
     if (!g_axs_panel) return;
 
@@ -156,7 +156,7 @@ void flushFrame() {
         320u * 480u
     );
 
-#elif defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+#elif PANEL_REQUIRES_CO5300_FRAME_SPRITE
 
     if (!g_co5300_panel) return;
 
@@ -170,7 +170,6 @@ void flushFrame() {
     g_frame_dirty = false;
     g_last_flush_ms = now;
 #endif
-}
 }
 
 // Pass-through hook for any future board-level rotation constraints. All four
@@ -499,7 +498,7 @@ void initDisplay() {
   tft.setRotation(0);
   tft.fillScreen(TFT_BLACK);
 #endif
-#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE) || defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+#if PANEL_REQUIRES_AXS_FRAME_SPRITE || PANEL_REQUIRES_CO5300_FRAME_SPRITE
 
     // Keep the physical panel at native rotation.
     // User rotation is applied to the PSRAM framebuffer instead.
@@ -517,15 +516,15 @@ void initDisplay() {
     Serial.println("Display: fillScreen done");
 
 
-#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE) || defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+#if PANEL_REQUIRES_AXS_FRAME_SPRITE || PANEL_REQUIRES_CO5300_FRAME_SPRITE
 
     _frame_sprite.setPsram(true);
     _frame_sprite.setColorDepth(16);
 
-#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE)
+#if PANEL_REQUIRES_AXS_FRAME_SPRITE
     const uint16_t frameW = 320;
     const uint16_t frameH = 480;
-#elif defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+#elif PANEL_REQUIRES_CO5300_FRAME_SPRITE
     const uint16_t frameW = 466;
     const uint16_t frameH = 466;
 #endif

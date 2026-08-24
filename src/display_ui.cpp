@@ -109,45 +109,68 @@ lgfx::LovyanGFX* tft_ptr = &_tft_instance;
 
 // Direct panel pointer for JC3248W535 sprite escape-hatch; nullptr on all
 // other boards so the extern declaration in display_ui.h is always satisfied.
-#if PANEL_REQUIRES_AXS_FRAME_SPRITE
+#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE)
+
 lgfx::Panel_AXS15231B_AGFX* g_axs_panel = _tft_instance.panelAXS();
 
-// Full-frame PSRAM sprite. All BambuHelper draws are redirected here in
-// initDisplay() (via tft_ptr), then flushed to the panel once per loop()
-// tick via flushFrame(). The AXS15231B in QSPI mode cannot address
-// arbitrary Y per draw (see lgfx_panel_axs15231b_agfx.hpp), so a
-// framebuffer-and-single-raster-flush is the only reliable render path.
+#elif defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+
+lgfx::Panel_CO5300_AGFX* g_co5300_panel = _tft_instance.panelCO5300();
+
+#endif
+
+
+#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE) || defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+
+// Full-frame PSRAM sprite. BambuHelper draws here first,
+// then the complete frame is pushed to the Arduino_GFX panel.
 static lgfx::LGFX_Sprite _frame_sprite(&_tft_instance);
 
-// Dirty flag: start true so the very first flushFrame() pushes the cleared
-// sprite + splash. Redraw sites call markFrameDirty() to request another
-// push. A keepalive in flushFrame() also forces one push every
-// FRAME_KEEPALIVE_MS as a safety net against missed dirty marks.
 static bool g_frame_dirty = true;
 static unsigned long g_last_flush_ms = 0;
 static const unsigned long FRAME_KEEPALIVE_MS = 500;
-#else
-lgfx::Panel_AXS15231B_AGFX* g_axs_panel = nullptr;
+
 #endif
 
 void markFrameDirty() {
-#if PANEL_REQUIRES_AXS_FRAME_SPRITE
+#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE) || defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
   g_frame_dirty = true;
 #endif
 }
 
 void flushFrame() {
-#if PANEL_REQUIRES_AXS_FRAME_SPRITE
-  if (!g_axs_panel || !_frame_sprite.getBuffer()) return;
-  unsigned long now = millis();
-  bool keepalive_due = (now - g_last_flush_ms) >= FRAME_KEEPALIVE_MS;
-  if (!g_frame_dirty && !keepalive_due) return;
-  g_axs_panel->pushRawPixels(
-    static_cast<uint16_t*>(_frame_sprite.getBuffer()),
-    320u * 480u);
-  g_frame_dirty = false;
-  g_last_flush_ms = now;
+#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE) || defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+    if (!_frame_sprite.getBuffer()) return;
+
+    unsigned long now = millis();
+    bool keepalive_due = (now - g_last_flush_ms) >= FRAME_KEEPALIVE_MS;
+
+    if (!g_frame_dirty && !keepalive_due) return;
+
+#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE)
+
+    if (!g_axs_panel) return;
+
+    g_axs_panel->pushRawPixels(
+        static_cast<uint16_t*>(_frame_sprite.getBuffer()),
+        320u * 480u
+    );
+
+#elif defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+
+    if (!g_co5300_panel) return;
+
+    g_co5300_panel->pushRawPixels(
+        static_cast<uint16_t*>(_frame_sprite.getBuffer()),
+        466u * 466u
+    );
+
 #endif
+
+    g_frame_dirty = false;
+    g_last_flush_ms = now;
+#endif
+}
 }
 
 // Pass-through hook for any future board-level rotation constraints. All four
@@ -476,37 +499,59 @@ void initDisplay() {
   tft.setRotation(0);
   tft.fillScreen(TFT_BLACK);
 #endif
-#if PANEL_REQUIRES_AXS_FRAME_SPRITE
-  // Panel MADCTL stays at 0 forever — RASET-skip + LSB-first byte-order
-  // invariants in pushRawPixels depend on native orientation. User-facing
-  // rotation is applied to the PSRAM sprite after tft_ptr is redirected.
-  tft.setRotation(0);
-#else
-  tft.setRotation(dispSettings.rotation);
-#endif
-  applyPanelInversion();
-  Serial.println("Display: setRotation done");
-  tft.fillScreen(CLR_BG);
-  Serial.println("Display: fillScreen done");
+#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE) || defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
 
-#if PANEL_REQUIRES_AXS_FRAME_SPRITE
-  // Allocate 320x480x16bpp PSRAM sprite (300 KB) and redirect tft_ptr so all
-  // subsequent draws (splash, UI, refreshes) render into the sprite buffer.
-  // Panel cannot address arbitrary Y in QSPI mode — instead we flush the
-  // whole sprite to the panel once per loop tick via flushFrame().
-  _frame_sprite.setPsram(true);
-  _frame_sprite.setColorDepth(16);
-  if (_frame_sprite.createSprite(320, 480)) {
-    _frame_sprite.setTextDatum(MC_DATUM);  // match the tft defaults used below
-    tft_ptr = &_frame_sprite;
-    Serial.printf("Display: frame sprite 320x480 allocated in PSRAM, free=%u\n",
-                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-    tft.setRotation(sanitizeRotation(dispSettings.rotation));
+    // Keep the physical panel at native rotation.
+    // User rotation is applied to the PSRAM framebuffer instead.
+    tft.setRotation(0);
+
+#else
+
+    tft.setRotation(dispSettings.rotation);
+
+#endif
+
+    applyPanelInversion();
+    Serial.println("Display: setRotation done");
     tft.fillScreen(CLR_BG);
-    flushFrame();  // push cleared sprite so panel shows CLR_BG during splash
-  } else {
-    Serial.println("Display: frame sprite alloc FAILED — will draw direct to panel (expect artifacts)");
-  }
+    Serial.println("Display: fillScreen done");
+
+
+#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE) || defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+
+    _frame_sprite.setPsram(true);
+    _frame_sprite.setColorDepth(16);
+
+#if defined(PANEL_REQUIRES_AXS_FRAME_SPRITE)
+    const uint16_t frameW = 320;
+    const uint16_t frameH = 480;
+#elif defined(PANEL_REQUIRES_CO5300_FRAME_SPRITE)
+    const uint16_t frameW = 466;
+    const uint16_t frameH = 466;
+#endif
+
+    if (_frame_sprite.createSprite(frameW, frameH)) {
+        _frame_sprite.setTextDatum(MC_DATUM);
+        tft_ptr = &_frame_sprite;
+
+        Serial.printf(
+            "Display: frame sprite %ux%u allocated in PSRAM, free=%u\n",
+            frameW,
+            frameH,
+            (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM)
+        );
+
+        tft.setRotation(sanitizeRotation(dispSettings.rotation));
+        tft.fillScreen(CLR_BG);
+
+        flushFrame();
+
+    } else {
+        Serial.println(
+            "Display: frame sprite alloc FAILED - will draw direct to panel"
+        );
+    }
+
 #endif
 
 

@@ -9,6 +9,7 @@ on:
       - 'src/**'
       - 'boards/ws_amoled_175.ini'
       - 'platformio.ini'
+      - 'merge_bins.py'
       - '.github/workflows/build-ws-amoled-175-full.yml'
 
 jobs:

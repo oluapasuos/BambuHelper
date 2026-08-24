@@ -29,7 +29,10 @@ jobs:
 
       - name: Build BambuHelper
         run: pio run -e ws_amoled_175
-
+        
+      - name: Create merged firmware
+        run: python merge_bins.py --board ws_amoled_175 --full
+        
       - name: Upload build files
         if: success()
         uses: actions/upload-artifact@v4
@@ -39,3 +42,4 @@ jobs:
             .pio/build/ws_amoled_175/firmware.bin
             .pio/build/ws_amoled_175/bootloader.bin
             .pio/build/ws_amoled_175/partitions.bin
+            firmware/**/BambuHelper-ws_amoled_175-*-Full.bin

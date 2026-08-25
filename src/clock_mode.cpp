@@ -286,6 +286,12 @@ void resetClock() {
 // when the line set changes, so it costs nothing on a steady screen.
 static void drawClockInfo(int sw, int sh, int clockBottom, uint16_t bg, uint16_t clr) {
   char lines[MAX_ACTIVE_PRINTERS][40];
+#if defined(DISPLAY_466x466)
+  // Keep the two fields separately as well: a single combined line is wider
+  // than the lower circle chord on the 1.75" AMOLED.
+  char names[MAX_ACTIVE_PRINTERS][24] = {{0}};
+  char ips[MAX_ACTIVE_PRINTERS][16] = {{0}};
+#endif
   int count = 0;
 
   if (dispSettings.showClockInfo) {
@@ -297,6 +303,10 @@ static void drawClockInfo(int sw, int sh, int clockBottom, uint16_t bg, uint16_t
       // back to the configured LAN IP before the first pushall arrives.
       const char* ip = (printers[i].state.localIp[0] != '\0') ? printers[i].state.localIp
                      : (cfg.ip[0] != '\0') ? cfg.ip : nullptr;
+#if defined(DISPLAY_466x466)
+      strlcpy(names[count], name, sizeof(names[count]));
+      if (ip) strlcpy(ips[count], ip, sizeof(ips[count]));
+#endif
       if (ip)
         snprintf(lines[count], sizeof(lines[count]), "%s  %s", name, ip);
       else
@@ -311,6 +321,37 @@ static void drawClockInfo(int sw, int sh, int clockBottom, uint16_t bg, uint16_t
     if (strcmp(lines[i], prevInfoLines[i]) != 0) changed = true;
   if (!changed) return;
 
+#if defined(DISPLAY_466x466)
+  // The 466x466 framebuffer is square but only its circular centre is visible.
+  // With one printer, split name and IP across two centred lines. This is both
+  // easier to read and keeps each field well inside the circle chord. With
+  // several printers, retain one compact line per printer and move the whole
+  // list upwards where the chord is wider.
+  const int maxRows = (count > prevInfoCount) ? count : prevInfoCount;
+  const int clearTop = (maxRows <= 1) ? 358 : 330;
+  tft.fillRect(0, clearTop, sw, sh - clearTop, bg);
+  markFrameDirty();
+
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(clr, bg);
+  if (count == 1) {
+    setFont(tft, FONT_BODY);
+    tft.setTextSize(1);
+    tft.drawString(names[0], sw / 2, 380);
+    if (ips[0][0] != '\0')
+      tft.drawString(ips[0], sw / 2, 410);
+  } else if (count > 1) {
+    setFont(tft, FONT_SMALL);
+    tft.setTextSize(1);
+    const int lineH = tft.fontHeight() + 3;
+    const int bottomY = 404;
+    for (int i = 0; i < count; i++) {
+      const int rowY = bottomY - (count - 1 - i) * lineH;
+      if (rowY - lineH / 2 < clockBottom + 4) continue;
+      tft.drawString(lines[i], sw / 2, rowY);
+    }
+  }
+#else
   setFont(tft, FONT_BODY);
   tft.setTextSize(1);
   const int lineH = tft.fontHeight() + 3;
@@ -352,6 +393,7 @@ static void drawClockInfo(int sw, int sh, int clockBottom, uint16_t bg, uint16_t
     if (rowY - lineH / 2 < clockBottom + 4) continue;
     tft.drawString(lines[i], sw / 2, rowY);
   }
+#endif
 
   prevInfoCount = count;
   for (int i = 0; i < MAX_ACTIVE_PRINTERS; i++) {

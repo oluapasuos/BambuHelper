@@ -168,6 +168,9 @@ struct BambuState {
   unsigned long lightOffDueMs; // millis() deadline for a scheduled light-off, 0 = none pending
 #if HAS_HMS_UI
   uint32_t printError;        // print.print_error, 0 = none
+  uint32_t printErrorBaseline;// non-zero value already standing at connect;
+                              // retained for diagnostics but never presented as
+                              // a new fault. Cleared when the value clears/changes.
   bool printErrorSeen;        // a value has been observed on this connection.
                               // First sight initializes without counting as an
                               // edge - booting into an error must not alert.

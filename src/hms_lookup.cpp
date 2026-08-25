@@ -232,7 +232,9 @@ ErrorBadge errorBadgeFor(const BambuState& s) {
   // print_error first: the job has stopped, which outranks any advisory HMS
   // still standing. A cancel is the user's own doing and never lights the
   // badge - printerWasCanceled() turns it into a state word instead.
-  if (s.printError != 0 && !printErrorIsCancel(s.printError)) {
+  if (s.printError != 0 &&
+      s.printError != s.printErrorBaseline &&
+      !printErrorIsCancel(s.printError)) {
     b.active = true;
     b.severity = 1;   // print_error carries no severity field; it stopped a print
     b.code = s.printError;

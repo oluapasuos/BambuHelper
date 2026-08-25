@@ -165,6 +165,14 @@ inline bool printErrorIsCancel(uint32_t err) {
   return err == PRINT_ERROR_CANCEL_MC || err == PRINT_ERROR_CANCEL_MAIN;
 }
 
+// FAILED plus the same print_error that was already standing in the connect
+// snapshot is the previous job's terminal state, not a new failure.
+inline bool printFailureIsBaseline(const BambuState& s) {
+  return s.gcodeStateId == GCODE_FAILED &&
+         s.printError != 0 &&
+         s.printError == s.printErrorBaseline;
+}
+
 // The printer stopped, and the reason is a cancel rather than a fault.
 inline bool printerWasCanceled(const BambuState& s) {
   return s.gcodeStateId == GCODE_FAILED && printErrorIsCancel(s.printError);
@@ -180,6 +188,7 @@ inline ErrorBadge errorBadgeFor(const BambuState&) { return ErrorBadge{}; }
 inline uint32_t   errorBadgeId(const BambuState&)  { return 0; }
 inline uint16_t   errorSeverityColor(uint8_t)      { return CLR_RED; }
 inline bool       printErrorIsCancel(uint32_t)     { return false; }
+inline bool       printFailureIsBaseline(const BambuState&) { return false; }
 inline bool       printerWasCanceled(const BambuState&) { return false; }
 inline bool       errorBadgeActive(const BambuState&)   { return false; }
 

@@ -1233,6 +1233,14 @@ static void parseMqttPayload(byte* payload, unsigned int length, BambuState& s,
       Serial.printf("MQTT: print_error %08X -> %08X%s\n",
                     s.printErrorSeen ? s.printError : 0u, pe,
                     s.printErrorSeen ? "" : " (first sight)");
+    // A print_error already present in the connect snapshot describes the
+    // previous job; it is history, not a new alert. Keep the raw value for the
+    // diagnostics page, but mark it as baseline until it clears or changes.
+    if (baselineWindow) {
+      s.printErrorBaseline = pe;
+    } else if (pe == 0 || pe != s.printError) {
+      s.printErrorBaseline = 0;
+    }
     s.printError = pe;
     s.printErrorSeen = true;
   }
@@ -1536,6 +1544,7 @@ static void reconnectConn(MqttConn& c) {
       BambuState& bs = printers[c.slotIndex].state;
       bs.hmsBaselineCount = 0;
       bs.hmsBaselineSaturated = false;
+      bs.printErrorBaseline = 0;
       bs.printErrorSeen = false;
     }
     c.hmsBaselineOpen = true;

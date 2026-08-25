@@ -1757,13 +1757,21 @@ static void drawIdle() {
     const char* stateStr = s.gcodeState;
     char finishBadge[40];
     if (s.gcodeStateId == GCODE_FAILED) {
-      // Kept ahead of the shared override so the wording stays "ERROR" here:
-      // this is a wide centred word, not a corner badge, and "ERR" reads like an
-      // abbreviation for no reason. A cancel reports FAILED too, and calling
-      // that an error sends people looking for a fault that does not exist.
-      const bool canceled = printerWasCanceled(s);
-      stateColor = canceled ? CLR_YELLOW : CLR_RED;
-      stateStr   = canceled ? "CANCELED" : "ERROR";
+      // At boot the state and print_error can arrive in separate deltas. Do not
+      // flash ERROR before the full snapshot explains the failure; and once it
+      // does, a failure already standing in that snapshot belongs to the
+      // previous job, so the idle dashboard is Ready rather than alarming.
+      if (printFailureIsBaseline(s)) {
+        stateColor = dispSettings.statusOkColor;
+        stateStr = "Ready";
+      } else if (!s.printErrorSeen) {
+        stateColor = CLR_TEXT_DIM;
+        stateStr = "Waiting...";
+      } else {
+        const bool canceled = printerWasCanceled(s);
+        stateColor = canceled ? CLR_YELLOW : CLR_RED;
+        stateStr   = canceled ? "CANCELED" : "ERROR";
+      }
     } else if (stateBadgeOverrideColor(s, stateColor)) {
       // An error standing while gcode_state reads IDLE / FINISH / UNKNOWN - the
       // ladder below would paint a green "Ready" straight over a live fault, and

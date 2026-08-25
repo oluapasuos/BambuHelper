@@ -1252,7 +1252,7 @@ void drawTempGauge(lgfx::LovyanGFX& gfx, int16_t cx, int16_t cy, int16_t radius,
     if (hasTarget) {
       setFont(gfx, FONT_SMALL);
       setGaugeClearedTextColor(gfx, CLR_TEXT_DIM, bg);
-      gfx.drawString(targetBuf, cx, cy + 10);
+      gfx.drawString(targetBuf, cx, cy + LY_TEMP_TARGET_OFFSET_Y);
     }
 
     drawGaugeLabel(gfx, cx, cy, radius, label, lblColor, bg);

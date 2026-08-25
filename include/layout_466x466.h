@@ -32,6 +32,7 @@
 #define LY_TEMP_GAUGE_T 8
 #define LY_GAUGE_VALUE_FONT FONT_LARGE
 #define LY_GAUGE_VALUE_NUDGE_Y 0
+#define LY_TEMP_TARGET_OFFSET_Y 14
 #define LY_COL1      94
 #define LY_COL2      233
 #define LY_COL3      372

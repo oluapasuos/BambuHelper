@@ -20,4 +20,11 @@
   #include "layout_default.h"   // ESP32-S3 Mini: ST7789 240x240
 #endif
 
+// Distance from a temperature gauge's centre to its smaller target line.
+// Individual layouts can increase it where a larger panel/font needs more
+// optical separation; the historical value remains the default everywhere.
+#ifndef LY_TEMP_TARGET_OFFSET_Y
+  #define LY_TEMP_TARGET_OFFSET_Y 10
+#endif
+
 #endif // LAYOUT_H

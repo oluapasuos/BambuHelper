@@ -1769,8 +1769,21 @@ static void drawIdle() {
         stateStr = "Waiting...";
       } else {
         const bool canceled = printerWasCanceled(s);
-        stateColor = canceled ? CLR_YELLOW : CLR_RED;
-        stateStr   = canceled ? "CANCELED" : "ERROR";
+        const bool stoppedWithoutError =
+            s.printError == 0 && !errorBadgeActive(s);
+        if (canceled) {
+          stateColor = CLR_YELLOW;
+          stateStr = "CANCELED";
+        } else if (stoppedWithoutError) {
+          // P1/P1S can leave gcode_state at FAILED after a user stop without
+          // publishing print_error or HMS. Calling that ERROR contradicts the
+          // diagnostics page, which correctly reports no active fault.
+          stateColor = CLR_YELLOW;
+          stateStr = "STOPPED";
+        } else {
+          stateColor = CLR_RED;
+          stateStr = "ERROR";
+        }
       }
     } else if (stateBadgeOverrideColor(s, stateColor)) {
       // An error standing while gcode_state reads IDLE / FINISH / UNKNOWN - the

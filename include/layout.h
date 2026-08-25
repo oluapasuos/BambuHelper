@@ -6,7 +6,9 @@
 // gauge positions, text positions, etc.
 // To add a new display: create layout_xxx.h and add an #elif here.
 
-#if defined(DISPLAY_480x480)
+#if defined(DISPLAY_466x466)
+  #include "layout_466x466.h"    // Waveshare AMOLED: round CO5300 466x466
+#elif defined(DISPLAY_480x480)
   #include "layout_480x480.h"    // SenseCAP Indicator: ST7701S 480x480
 #elif defined(DISPLAY_ROUND_240)
   #include "layout_round240.h"  // GC9A01 1.28" round 240x240

@@ -109,14 +109,8 @@ public:
     // There is no conventional GPIO LED backlight on this board.
     _agfx->setBrightness(160);
 
-    Serial.println("CO5300: begin OK - direct red test");
+    // Leave the AMOLED black until the UI draws its first frame.
 
-_agfx->fillScreen(0xF800);   // vermelho RGB565
-delay(2000);
-_agfx->fillScreen(0x0000);   // preto
-
-Serial.println("CO5300: direct red test done");
-    
     _init_done = true;
     _width  = _cfg.panel_width;
     _height = _cfg.panel_height;

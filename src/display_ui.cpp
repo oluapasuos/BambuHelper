@@ -2784,6 +2784,21 @@ static void computeSlotGrid(SlotGrid& g, const PrinterConfig& cfg, bool landscap
   g.y[0]=r0; g.y[1]=r0; g.y[2]=r0; g.y[3]=r1; g.y[4]=r1; g.y[5]=r1;
 }
 
+// On the 466x466 round AMOLED the full-width top progress bar is visible only
+// through the panel's narrow top chord, so it looks like a detached arc. Avoid
+// duplicating the same value when the configurable grid already contains a
+// Progress gauge; keep the bar as a fallback when the user assigns all six
+// slots to other metrics. Other display profiles retain their existing bar.
+static bool topProgressBarVisibleForPrinting() {
+#if defined(DISPLAY_466x466)
+  const PrinterConfig& cfg = displayedPrinter().config;
+  for (uint8_t i = 0; i < GAUGE_SLOT_COUNT; i++) {
+    if (cfg.gaugeSlots[i] == GAUGE_PROGRESS) return false;
+  }
+#endif
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 //  Screen: Printing (main dashboard)
 //  Layout: LED bar | header | 2x3 gauge grid | info line
@@ -4042,9 +4057,21 @@ static void drawPrinting() {
 #endif
 
   // === H2-style LED progress bar (y=0-5) ===
-  if (progChanged && !glowIsActive()) {  // glow band owns the top edge
+  // The 466x466 round AMOLED hides this whenever the grid already carries a
+  // Progress gauge. A visibility transition also needs a redraw so changing
+  // the slot configuration cannot leave the old top arc behind.
+  const bool showTopProgressBar = topProgressBarVisibleForPrinting();
+  static bool prevTopProgressBarVisible = true;
+  const bool topProgressBarVisibilityChanged =
+      (showTopProgressBar != prevTopProgressBarVisible);
+  const bool topProgressBarNeedsRedraw =
+      topProgressBarVisibilityChanged ||
+      (showTopProgressBar && progChanged) ||
+      (!showTopProgressBar && forceRedraw);
+  if (topProgressBarNeedsRedraw && !glowIsActive()) {  // glow owns the top edge
     markFrameDirty();
-    drawLedProgressBar(tft, 0, s.progress);
+    drawLedProgressBar(tft, 0, showTopProgressBar ? s.progress : 0);
+    prevTopProgressBarVisible = showTopProgressBar;
   }
 
   // === Header bar ===
@@ -5542,7 +5569,8 @@ void updateDisplay() {
 #if !defined(DISPLAY_ROUND_240)
   // Shimmer runs at its own cadence (~40fps), independent of display refresh.
   // Round displays have no top LED bar (the rim ring replaces it), no shimmer.
-  if (currentScreen == SCREEN_PRINTING && !glowIsActive()) {
+  if (currentScreen == SCREEN_PRINTING && !glowIsActive() &&
+      topProgressBarVisibleForPrinting()) {
     // The glow band owns the top edge while it runs - shimmer would fight it.
     BambuState& sh = displayedPrinter().state;
     tickProgressShimmer(tft, 0, sh.progress, sh.printing);

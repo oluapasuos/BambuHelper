@@ -171,8 +171,30 @@ void sanitizeHostname(const char* in, char* out, size_t outSize) {
 }
 
 // ---------------------------------------------------------------------------
-//  Default display settings (matches original config.h colors)
+//  Default display settings
 // ---------------------------------------------------------------------------
+#if defined(DISPLAY_466x466)
+// AMOLED palette: distinct semantic families on black.
+// Progress = violet, heat = coral/amber, airflow = cyan/blue/teal.
+static constexpr uint16_t AMO_TRACK       = 0x2188; // #233044
+static constexpr uint16_t AMO_PROGRESS    = 0x9B7F; // #9B6DFF
+static constexpr uint16_t AMO_PROGRESS_L  = 0xBCDF; // #B99BFF
+static constexpr uint16_t AMO_NOZZLE      = 0xFAC6; // #FF5A36
+static constexpr uint16_t AMO_NOZZLE_L    = 0xFC4C; // #FF8A66
+static constexpr uint16_t AMO_BED         = 0xFE08; // #FFC247
+static constexpr uint16_t AMO_BED_L       = 0xFEAD; // #FFD66B
+static constexpr uint16_t AMO_PART_FAN    = 0x16DF; // #14D9FF
+static constexpr uint16_t AMO_PART_FAN_L  = 0x675F; // #63E8FF
+static constexpr uint16_t AMO_AUX_FAN     = 0x33DE; // #3478F6
+static constexpr uint16_t AMO_AUX_FAN_L   = 0x7D5F; // #78A8FF
+static constexpr uint16_t AMO_CHAMBER_FAN = 0x26B3; // #20D69B
+static constexpr uint16_t AMO_CHAMBER_L   = 0x6F37; // #69E7BE
+static constexpr uint16_t AMO_CHAMBER_TMP = 0xF2F7; // #F05FBC
+static constexpr uint16_t AMO_CHAMBER_TL  = 0xF479; // #F58CCC
+static constexpr uint16_t AMO_HEATBREAK   = 0x05D5; // #00B8A9
+static constexpr uint16_t AMO_HEATBREAK_L = 0x5F3B; // #5DE5D8
+#endif
+
 void defaultDisplaySettings(DisplaySettings& ds) {
   ds.rotation = 0;
   ds.bgColor = CLR_BG;
@@ -254,6 +276,25 @@ void defaultDisplaySettings(DisplaySettings& ds) {
   ds.power = { CLR_GOLD, CLR_GOLD, CLR_TEXT_DEFAULT };
   // Layer: green arc + label, white value (matches the previous Progress reuse)
   ds.layer = { CLR_GREEN, CLR_GREEN, CLR_TEXT_DEFAULT };
+
+#if defined(DISPLAY_466x466)
+  // The round AMOLED benefits from a broader, purpose-driven palette. Labels
+  // use a lighter tint of their arc so they stay legible in camera exposure
+  // without turning every readout into the same white.
+  ds.trackColor       = AMO_TRACK;
+  ds.progressBarColor = AMO_PROGRESS;
+  ds.progress       = { AMO_PROGRESS,    AMO_PROGRESS_L,  CLR_TEXT_DEFAULT };
+  ds.nozzle         = { AMO_NOZZLE,      AMO_NOZZLE_L,    CLR_TEXT_DEFAULT };
+  ds.bed            = { AMO_BED,         AMO_BED_L,       CLR_TEXT_DEFAULT };
+  ds.partFan        = { AMO_PART_FAN,    AMO_PART_FAN_L,  CLR_TEXT_DEFAULT };
+  ds.auxFan         = { AMO_AUX_FAN,     AMO_AUX_FAN_L,   CLR_TEXT_DEFAULT };
+  ds.auxFanRight    = { AMO_AUX_FAN,     AMO_AUX_FAN_L,   CLR_TEXT_DEFAULT };
+  ds.chamberFan     = { AMO_CHAMBER_FAN, AMO_CHAMBER_L,   CLR_TEXT_DEFAULT };
+  ds.exhaustFan     = { AMO_CHAMBER_FAN, AMO_CHAMBER_L,   CLR_TEXT_DEFAULT };
+  ds.chamberTemp    = { AMO_CHAMBER_TMP, AMO_CHAMBER_TL,  CLR_TEXT_DEFAULT };
+  ds.heatbreak      = { AMO_HEATBREAK,   AMO_HEATBREAK_L, CLR_TEXT_DEFAULT };
+  ds.layer          = { AMO_PROGRESS,    AMO_PROGRESS_L,  CLR_TEXT_DEFAULT };
+#endif
 }
 
 // Default standard 2x3 grid: Progress, Nozzle, Bed, Part Fan, Aux Fan, Chamber Fan.
@@ -684,6 +725,43 @@ void loadSettings() {
   } else {
     dispSettings.progressBarColor = dispSettings.progress.arc;
   }
+
+#if defined(DISPLAY_466x466)
+  // One-shot upgrade for devices that already persisted the old factory
+  // palette. Exact triple matching protects every user-customized gauge.
+  if (!prefs.getBool("dsp_466pal1", false)) {
+    auto migrateFactoryGauge = [&](const char* key, GaugeColors& gc,
+                                   uint16_t oldColor,
+                                   uint16_t newArc, uint16_t newLabel) {
+      if (gc.arc == oldColor && gc.label == oldColor &&
+          gc.value == CLR_TEXT_DEFAULT) {
+        gc = { newArc, newLabel, CLR_TEXT_DEFAULT };
+        saveGaugeColors(key, gc);
+      }
+    };
+    migrateFactoryGauge("gc_prg", dispSettings.progress,      CLR_GREEN,  AMO_PROGRESS,    AMO_PROGRESS_L);
+    migrateFactoryGauge("gc_noz", dispSettings.nozzle,        CLR_ORANGE, AMO_NOZZLE,      AMO_NOZZLE_L);
+    migrateFactoryGauge("gc_bed", dispSettings.bed,           CLR_CYAN,   AMO_BED,         AMO_BED_L);
+    migrateFactoryGauge("gc_pfn", dispSettings.partFan,       CLR_CYAN,   AMO_PART_FAN,    AMO_PART_FAN_L);
+    migrateFactoryGauge("gc_afn", dispSettings.auxFan,        CLR_ORANGE, AMO_AUX_FAN,     AMO_AUX_FAN_L);
+    migrateFactoryGauge("gc_afr", dispSettings.auxFanRight,   CLR_ORANGE, AMO_AUX_FAN,     AMO_AUX_FAN_L);
+    migrateFactoryGauge("gc_cfn", dispSettings.chamberFan,    CLR_GREEN,  AMO_CHAMBER_FAN, AMO_CHAMBER_L);
+    migrateFactoryGauge("gc_exh", dispSettings.exhaustFan,    CLR_GREEN,  AMO_CHAMBER_FAN, AMO_CHAMBER_L);
+    migrateFactoryGauge("gc_cht", dispSettings.chamberTemp,   CLR_CYAN,   AMO_CHAMBER_TMP, AMO_CHAMBER_TL);
+    migrateFactoryGauge("gc_hbk", dispSettings.heatbreak,     CLR_ORANGE, AMO_HEATBREAK,   AMO_HEATBREAK_L);
+    migrateFactoryGauge("gc_lyr", dispSettings.layer,         CLR_GREEN,  AMO_PROGRESS,    AMO_PROGRESS_L);
+
+    if (dispSettings.trackColor == CLR_TRACK) {
+      dispSettings.trackColor = AMO_TRACK;
+      prefs.putUShort("dsp_trk", dispSettings.trackColor);
+    }
+    if (dispSettings.progressBarColor == CLR_GREEN) {
+      dispSettings.progressBarColor = AMO_PROGRESS;
+      prefs.putUShort("dsp_pbar", dispSettings.progressBarColor);
+    }
+    prefs.putBool("dsp_466pal1", true);
+  }
+#endif
 
   // Network settings
   netSettings.useDHCP = prefs.getBool("net_dhcp", true);

@@ -4566,6 +4566,14 @@ static void drawPrinting() {
     tft.fillRect(0, eff_botY, botW, eff_botH, CLR_BG);
     setFont(tft, FONT_BODY);
 
+#if defined(DISPLAY_466x466)
+    // The round AMOLED cannot use the rectangular three-column footer:
+    // the edge items fall outside the visible chord and overlap the centre.
+    // Keep one unambiguous, centred connectivity readout below the ETA.
+    tft.fillRect(botCx - 80, LY_WIFI_Y - 14, 160, 28, CLR_BG);
+    drawWifiSignalIndicator(s, LY_WIFI_Y);
+#else
+
     // Right indicator geometry (door status or speed mode), computed once so the
     // filament-name clamp and the actual draw below stay in sync.
     const bool rightIsDoor = s.doorSensorPresent;
@@ -4654,6 +4662,7 @@ static void drawPrinting() {
       tft.setTextColor(speedLevelColor(s.speedLevel), CLR_BG);
       tft.drawString(speedLevelName(s.speedLevel), rightAnchorX, eff_botCY);
     }
+#endif // !DISPLAY_466x466
   }
 }
 #endif // !DISPLAY_ROUND_240

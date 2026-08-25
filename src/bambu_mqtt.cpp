@@ -1846,21 +1846,15 @@ static void handleConn(MqttConn& c) {
       }
     }
 
-  // --- FAILED on cloud: cloud broker stops pushing state changes ---
-  // After a print fails, Bambu cloud goes silent: starting a new print on
-  // the printer (Studio/Handy) doesn't trigger a state push to subscribers.
-  // Send a rare recovery pushall (~5 min spacing) so the device notices a
-  // new print without the user having to open Bambu Handy to nudge cloud.
-  // Also still gated by the 2-min global throttle as belt-and-braces.
+  // --- FAILED on cloud: wait for the broker, do not command the printer ---
+  // Recent P1/P1S firmware verifies MQTT control commands. Publishing an
+  // unsigned pushall while the printer is settling after a cancel raises
+  // HMS_0500-0500-0001-0007 ("MQTT Command verification failed"). That is
+  // worse than a possibly stale STOPPED screen, so this state is passive.
+  // The normal cloud stream, Handy/Studio activity, or the next reconnect will
+  // move the state on without BambuHelper manufacturing a printer fault.
   } else if (isConnected && cloud && s.gcodeStateId == GCODE_FAILED && connAlive) {
-    bool retryDue = (c.stalePushallSentMs == 0) ||
-                    (millis() - c.stalePushallSentMs > 300000);
-    if (retryDue && !cloudPushallThrottled) {
-      MQTT_LOG("[%d] FAILED on cloud - sending recovery pushall", c.slotIndex);
-      esp_task_wdt_reset();
-      if (requestPushall(c, PUSHALL_RECOVERY_FAILED))
-        c.stalePushallSentMs = millis();
-    }
+    c.stalePushallSentMs = 0;
 
   // --- Any other state ---
   } else if (s.gcodeStateId != GCODE_UNKNOWN) {

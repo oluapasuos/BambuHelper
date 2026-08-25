@@ -1923,6 +1923,13 @@ static void drawIdle() {
     tft.fillRect(cx - 70, LY_RND_IDLE_WIFI_Y - 12, 140, 24, CLR_BG);
     setFont(tft, FONT_BODY);
     drawWifiSignalIndicator(s, LY_RND_IDLE_WIFI_Y);
+#elif defined(DISPLAY_466x466)
+    // The 466x466 CO5300 is round too. Keep the WiFi status centred inside the
+    // lower chord instead of drawing the rectangular bottom bar into invisible
+    // corner pixels.
+    tft.fillRect(cx - 80, LY_WIFI_Y - 14, 160, 28, CLR_BG);
+    setFont(tft, FONT_BODY);
+    drawWifiSignalIndicator(s, LY_WIFI_Y);
 #else
     tft.fillRect(0, scrH - 18, scrW, 18, CLR_BG);
     setFont(tft, FONT_BODY);

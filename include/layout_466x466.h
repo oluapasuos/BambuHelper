@@ -17,13 +17,14 @@
 #define LY_BAR_H   10
 
 // --- Header bar ---
-// At y=44 the circular chord begins near x=96, so both edges are pulled inward.
-#define LY_HDR_Y        24
-#define LY_HDR_H        40
-#define LY_HDR_NAME_X   100
-#define LY_HDR_CY       44
-#define LY_HDR_BADGE_RX 100
-#define LY_HDR_DOT_CY   48
+// The glyphs extend above their vertical datum. Keep their full bounding box
+// inside the narrowing top chord, with a small optical margin at both sides.
+#define LY_HDR_Y        28
+#define LY_HDR_H        50
+#define LY_HDR_NAME_X   104
+#define LY_HDR_CY       54
+#define LY_HDR_BADGE_RX 104
+#define LY_HDR_DOT_CY   70
 
 // --- Printing: 2x3 gauge grid ---
 #define LY_GAUGE_R   54

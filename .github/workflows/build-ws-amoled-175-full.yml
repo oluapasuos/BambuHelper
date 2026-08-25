@@ -7,6 +7,7 @@ on:
       - ws-amoled-175-port-v2
     paths:
       - 'src/**'
+      - 'include/**'
       - 'boards/ws_amoled_175.ini'
       - 'platformio.ini'
       - 'merge_bins.py'

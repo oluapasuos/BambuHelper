@@ -26,16 +26,16 @@
 #define LY_HDR_DOT_CY   48
 
 // --- Printing: 2x3 gauge grid ---
-#define LY_GAUGE_R   58
+#define LY_GAUGE_R   54
 #define LY_GAUGE_T   11
 #define LY_TEMP_GAUGE_T 8
 #define LY_GAUGE_VALUE_FONT FONT_LARGE
 #define LY_GAUGE_VALUE_NUDGE_Y 0
-#define LY_COL1      82
+#define LY_COL1      94
 #define LY_COL2      233
-#define LY_COL3      384
-#define LY_ROW1      130
-#define LY_ROW2      280
+#define LY_COL3      372
+#define LY_ROW1      132
+#define LY_ROW2      258
 
 // --- AMS tray visualization ---
 #define LY_AMS_Y                205

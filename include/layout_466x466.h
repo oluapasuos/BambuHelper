@@ -60,8 +60,8 @@
 #define LY_BOT_CY   415
 
 // --- Printing: WiFi signal indicator ---
-#define LY_WIFI_X    100
-#define LY_WIFI_Y    415
+#define LY_WIFI_X    193
+#define LY_WIFI_Y    390
 
 // --- Battery indicator placeholders ---
 #define LY_BAT_W       16

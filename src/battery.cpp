@@ -95,8 +95,8 @@ void begin() {
 #endif
 
 #if defined(BOARD_HAS_BAT_AXP2101)
-  // Bring up the shared I2C bus explicitly; ES8311 audio and CST816 touch
-  // also call Wire.begin(42,41) and the order between drivers isn't fixed.
+  // Bring up the board's shared I2C bus explicitly. The pins are defined by
+  // each AXP2101 board profile; other onboard devices must reuse this bus.
   Wire.begin(AXP2101_I2C_SDA, AXP2101_I2C_SCL);
   delay(10);
 
@@ -113,6 +113,20 @@ void begin() {
     s_present = false;
     return;
   }
+
+#if defined(BOARD_IS_WS_AMOLED_175)
+  // The AXP2101, rather than the ESP32 application, owns the physical PWR
+  // button. Configure its shortest supported deliberate hold and let the PMIC
+  // cut every rail directly. This is a true battery power-off and remains
+  // available even if Wi-Fi or the application loop has stalled.
+  bool pwrOnTimeOk = s_pmu.setPowerKeyPressOnTime(XPOWERS_POWERON_512MS);
+  bool pwrOffTimeOk = s_pmu.setPowerKeyPressOffTime(XPOWERS_POWEROFF_4S);
+  s_pmu.setLongPressPowerOFF();
+  s_pmu.enableLongPressShutdown();
+  Serial.printf("[BAT] PWR key: on=512ms(%d) off=4s(%d) action=power-off\n",
+                pwrOnTimeOk, pwrOffTimeOk);
+#endif
+
   s_pmu.disableTSPinMeasure();
   s_pmu.enableBattDetection();
   s_pmu.enableVbusVoltageMeasure();

@@ -8,6 +8,7 @@
 #include "button_touch_backend.h"
 
 #if (defined(USE_XPT2046) + defined(USE_CST816) + defined(USE_CST328) \
+     + defined(USE_CST9217) \
      + defined(USE_FT5X06) + defined(USE_FT6336) + defined(USE_AXS_TOUCH)) == 0
 
 #if defined(TOUCH_CS)

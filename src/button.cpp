@@ -163,6 +163,16 @@ void sanitizeButtonPin() {
   if (buttonPin == CST328_RST) { clash("CST328 touch RST"); return; }
   #endif
 #endif
+#if defined(USE_CST9217)
+  if (buttonPin == CST9217_SDA) { clash("CST9217 touch SDA"); return; }
+  if (buttonPin == CST9217_SCL) { clash("CST9217 touch SCL"); return; }
+  #if defined(CST9217_IRQ)
+  if (buttonPin == CST9217_IRQ) { clash("CST9217 touch IRQ"); return; }
+  #endif
+  #if defined(CST9217_RST)
+  if (buttonPin == CST9217_RST) { clash("CST9217 touch RST"); return; }
+  #endif
+#endif
 #if defined(USE_XPT2046)
   if (buttonPin == TOUCH_CS)   { clash("XPT2046 CS");   return; }
   if (buttonPin == TOUCH_IRQ)  { clash("XPT2046 IRQ");  return; }

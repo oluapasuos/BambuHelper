@@ -835,12 +835,27 @@ void loadSettings() {
   rotState.lastRotateMs = 0;
 
   // Button settings
-#if defined(USE_CST816) || defined(USE_CST328) || defined(USE_XPT2046) || defined(USE_FT5X06) || defined(USE_FT6336) || defined(USE_AXS_TOUCH) || defined(TOUCH_CS)
+#if defined(USE_CST816) || defined(USE_CST328) || defined(USE_CST9217) || defined(USE_XPT2046) || defined(USE_FT5X06) || defined(USE_FT6336) || defined(USE_AXS_TOUCH) || defined(TOUCH_CS)
   buttonType = (ButtonType)prefs.getUChar("btn_type", BTN_TOUCHSCREEN);
 #else
   buttonType = (ButtonType)prefs.getUChar("btn_type", BTN_DISABLED);
 #endif
   buttonPin = prefs.getUChar("btn_pin", BUTTON_DEFAULT_PIN);
+#if defined(BOARD_IS_WS_AMOLED_175) && defined(USE_CST9217)
+  // Earlier AMOLED 1.75 builds had no touch backend, so saving any settings
+  // also persisted BTN_DISABLED even though the panel physically has touch.
+  // Enable the newly-supported controller once, but preserve any non-disabled
+  // button type. The migration stamp means a later explicit Disable remains
+  // disabled across every subsequent boot/update.
+  if (!prefs.getBool("ws175_tch1", false)) {
+    if (buttonType == BTN_DISABLED) {
+      buttonType = BTN_TOUCHSCREEN;
+      prefs.putUChar("btn_type", buttonType);
+      Serial.println("Button: enabled CST9217 touchscreen (one-time migration)");
+    }
+    prefs.putBool("ws175_tch1", true);
+  }
+#endif
 
   // Buzzer settings
   buzzerSettings.enabled = prefs.getBool("buz_on", false);

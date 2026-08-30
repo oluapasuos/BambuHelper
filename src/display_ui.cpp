@@ -5256,6 +5256,58 @@ static void drawPowerConfirm() {
 }
 
 // ---------------------------------------------------------------------------
+//  SCREEN_TOUCH_MENU: quick actions for the 466x466 CST9217 panel
+// ---------------------------------------------------------------------------
+#if defined(USE_CST9217) && defined(DISPLAY_466x466)
+static void drawTouchMenuButton(int16_t y, const char* label, uint16_t accent) {
+  const int16_t x = 54;
+  const int16_t w = 358;
+  const int16_t h = 64;
+  const int16_t r = 22;
+
+  tft.fillRoundRect(x, y, w, h, r, CLR_CARD);
+  tft.drawRoundRect(x, y, w, h, r, accent);
+  tft.fillCircle(x + 30, y + h / 2, 5, accent);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(CLR_TEXT, CLR_CARD);
+  setFont(tft, FONT_BODY);
+  tft.drawString(label, x + w / 2, y + h / 2);
+}
+
+static void drawTouchMenu() {
+  if (!forceRedraw) return;
+
+  const int16_t cx = uiW() / 2;
+  tft.fillScreen(CLR_BG);
+  markFrameDirty();
+
+  tft.setTextDatum(MC_DATUM);
+  setFont(tft, FONT_LARGE);
+  tft.setTextColor(CLR_TEXT, CLR_BG);
+  tft.drawString("TOUCH MENU", cx, 66);
+
+  char batteryLine[40];
+  if (Battery::isPresent()) {
+    snprintf(batteryLine, sizeof(batteryLine), "BATTERY  %u%%  /  %.2f V",
+             Battery::percent(), Battery::voltage());
+  } else {
+    strlcpy(batteryLine, "BATTERY NOT DETECTED", sizeof(batteryLine));
+  }
+  setFont(tft, FONT_SMALL);
+  tft.setTextColor(CLR_TEXT_DIM, CLR_BG);
+  tft.drawString(batteryLine, cx, 98);
+
+  drawTouchMenuButton(126, "CLOCK",       0x9B7F);
+  drawTouchMenuButton(211, "DISPLAY OFF", CLR_ORANGE);
+  drawTouchMenuButton(296, "CLOSE",       CLR_TEXT_DIM);
+
+  setFont(tft, FONT_SMALL);
+  tft.setTextColor(CLR_TEXT_DARK, CLR_BG);
+  tft.drawString("Hold PWR 4s for full power off", cx, 399);
+}
+#endif
+
+// ---------------------------------------------------------------------------
 //  SCREEN_HMS: printer error detail
 // ---------------------------------------------------------------------------
 #if HAS_HMS_UI
@@ -5760,6 +5812,12 @@ void updateDisplay() {
 
     case SCREEN_POWER_CONFIRM:
       drawPowerConfirm();
+      break;
+
+    case SCREEN_TOUCH_MENU:
+#if defined(USE_CST9217) && defined(DISPLAY_466x466)
+      drawTouchMenu();
+#endif
       break;
 
     case SCREEN_HMS:

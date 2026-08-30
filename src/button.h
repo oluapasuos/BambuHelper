@@ -6,6 +6,7 @@
 enum class TouchGestureType : uint8_t {
   None,
   Tap,
+  LongPress,
   SwipeLeft,
   SwipeRight,
 };

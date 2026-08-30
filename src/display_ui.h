@@ -23,6 +23,7 @@ enum ScreenState {
   SCREEN_SPLIT,         // two printers side-by-side (top/bottom bands)
   SCREEN_CAMERA,        // fullscreen P1/A1 chamber image (#120); tap to exit
   SCREEN_POWER_CONFIRM, // fullscreen plug on/off confirmation (#136); hold to confirm
+  SCREEN_TOUCH_MENU,    // CST9217 quick menu; long press to open
   SCREEN_DRY_PEEK,      // AMS drying view tapped up during a print (#150); auto-closes
   SCREEN_HMS            // printer error detail; tap to open while one is active
 };

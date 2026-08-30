@@ -12,6 +12,7 @@ static bool stableState = false;
 static unsigned long lastChangeMs = 0;
 static unsigned long pressStartMs = 0;
 static const unsigned long DEBOUNCE_MS = 50;
+static const uint32_t TOUCH_LONG_PRESS_MS = 900;
 static const int16_t TOUCH_SWIPE_MIN_PX = 64;
 static const int16_t TOUCH_SWIPE_AXIS_MARGIN_PX = 24;
 
@@ -64,7 +65,12 @@ static void finishGesture(const TouchPoll& tp) {
   const int16_t absDx = (dx < 0) ? -dx : dx;
   const int16_t absDy = (dy < 0) ? -dy : dy;
 
-  TouchGestureType type = TouchGestureType::Tap;
+  const uint32_t durationMs = gestureStartMs == 0
+                              ? 0
+                              : static_cast<uint32_t>(millis() - gestureStartMs);
+  TouchGestureType type = durationMs >= TOUCH_LONG_PRESS_MS
+                          ? TouchGestureType::LongPress
+                          : TouchGestureType::Tap;
   if (absDx >= TOUCH_SWIPE_MIN_PX &&
       absDx >= absDy + TOUCH_SWIPE_AXIS_MARGIN_PX) {
     type = (dx < 0) ? TouchGestureType::SwipeLeft
@@ -73,7 +79,7 @@ static void finishGesture(const TouchPoll& tp) {
 
   pendingGesture = {
     type, gestureStartX, gestureStartY, dx, dy,
-    gestureStartMs == 0 ? 0 : static_cast<uint32_t>(millis() - gestureStartMs)
+    durationMs
   };
   resetGestureTracking();
 }

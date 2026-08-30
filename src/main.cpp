@@ -72,6 +72,12 @@ static volatile bool pcSendingDrawn  = false;
 static const uint32_t DRY_PEEK_MS = 10000;
 static uint32_t dryPeekUntilMs = 0;
 
+#if defined(USE_CST9217) && defined(DISPLAY_466x466)
+static const uint32_t TOUCH_MENU_MS = 15000;
+static uint32_t touchMenuUntilMs = 0;
+static ScreenState touchMenuPriorScreen = SCREEN_IDLE;
+#endif
+
 static bool isPrinterActivityStateFresh(uint8_t slot) {
   if (slot >= MAX_ACTIVE_PRINTERS || !isPrinterConfigured(slot)) return false;
   BambuState& s = printers[slot].state;
@@ -432,6 +438,20 @@ static void registerTap() {
 }
 
 #if defined(USE_CST9217) && defined(DISPLAY_466x466)
+static void openTouchMenu() {
+  ScreenState cur = getScreenState();
+  if (cur == SCREEN_OTA_UPDATE || cur == SCREEN_POWER_CONFIRM) return;
+  if (cur != SCREEN_TOUCH_MENU) touchMenuPriorScreen = cur;
+  touchMenuUntilMs = millis() + TOUCH_MENU_MS;
+  setBacklight(getEffectiveBrightness());
+  setScreenState(SCREEN_TOUCH_MENU);
+}
+
+static void closeTouchMenu() {
+  touchMenuUntilMs = 0;
+  setScreenState(touchMenuPriorScreen);
+}
+
 static bool touchHitsErrorBadge(const TouchGesture& gesture) {
   // Header badge anchor is x=362, y=54 in layout_466x466.h. Keep a generous
   // finger-sized rectangle around both its dot and the ERR text.
@@ -454,12 +474,39 @@ static void leaveContextScreenForSwipe() {
 
 static void dispatchCst9217Gesture(const TouchGesture& gesture) {
   const char* label = "TAP";
+  if (gesture.type == TouchGestureType::LongPress) label = "LONG_PRESS";
   if (gesture.type == TouchGestureType::SwipeLeft) label = "SWIPE_LEFT";
   if (gesture.type == TouchGestureType::SwipeRight) label = "SWIPE_RIGHT";
   Serial.printf("Touch gesture: %s x=%d y=%d dx=%d dy=%d ms=%lu\n",
                 label, gesture.x, gesture.y,
                 gesture.deltaX, gesture.deltaY,
                 static_cast<unsigned long>(gesture.durationMs));
+
+  if (getScreenState() == SCREEN_TOUCH_MENU) {
+    touchMenuUntilMs = millis() + TOUCH_MENU_MS;
+    if (gesture.type == TouchGestureType::LongPress) {
+      closeTouchMenu();
+      return;
+    }
+    if (gesture.type != TouchGestureType::Tap) return;
+
+    const bool insideButton = gesture.x >= 54 && gesture.x <= 412;
+    if (insideButton && gesture.y >= 126 && gesture.y <= 190) {
+      touchMenuUntilMs = 0;
+      setScreenState(SCREEN_CLOCK);
+    } else if (insideButton && gesture.y >= 211 && gesture.y <= 275) {
+      touchMenuUntilMs = 0;
+      setScreenState(SCREEN_OFF);
+    } else if (insideButton && gesture.y >= 296 && gesture.y <= 360) {
+      closeTouchMenu();
+    }
+    return;
+  }
+
+  if (gesture.type == TouchGestureType::LongPress) {
+    openTouchMenu();
+    return;
+  }
 
   if (gesture.type == TouchGestureType::Tap) {
     ScreenState cur = getScreenState();
@@ -831,6 +878,12 @@ static void updateDisplayedPrinterScreenState() {
   // so an auto-OTA still preempts it.
   if (current == SCREEN_POWER_CONFIRM) return;
 
+#if defined(USE_CST9217) && defined(DISPLAY_466x466)
+  // The touch quick menu is modal but lower priority than OTA. Printer state
+  // continues updating behind it and is re-derived after close/timeout.
+  if (current == SCREEN_TOUCH_MENU) return;
+#endif
+
   // Printer error detail is sticky for its window: hold it against the auto
   // state machine until the user taps out, the error clears, or the window runs
   // down. Above camera and the drying peek so neither steals it; below OTA and
@@ -984,6 +1037,14 @@ static void handleDisplaySleepTimeouts() {
   // Covers both SCREEN_IDLE (printer connected but not printing) and
   // SCREEN_CONNECTING_MQTT (printer offline/unreachable at startup).
   ScreenState cur = getScreenState();
+
+#if defined(USE_CST9217) && defined(DISPLAY_466x466)
+  if (cur == SCREEN_TOUCH_MENU &&
+      (long)(millis() - touchMenuUntilMs) >= 0) {
+    closeTouchMenu();
+    cur = getScreenState();
+  }
+#endif
 
   // AMS drying peek (#150) auto-close. This runs unconditionally, unlike
   // updateDisplayedPrinterScreenState() which is gated on WiFi being up - a

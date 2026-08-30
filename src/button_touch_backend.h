@@ -33,6 +33,12 @@ enum class TouchEvent : uint8_t {
 struct TouchPoll {
   TouchEvent ev;
   bool isDown;  // meaningful for level backends (ev == None); raw finger-down
+  // Optional screen-space point. Most legacy backends remain button-only and
+  // leave hasPoint false; coordinate-capable panels can expose gestures
+  // without changing their existing press/hold behaviour.
+  bool hasPoint;
+  int16_t x;
+  int16_t y;
 };
 
 // Bring up the touch bus/pins + first probe (all logging inside). Called from

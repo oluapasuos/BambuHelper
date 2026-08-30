@@ -18,6 +18,7 @@ constexpr uint8_t  CST9217_REPORT_ACK       = 0xAB;
 constexpr uint8_t  CST9217_FINGER_DOWN      = 0x06;
 constexpr uint8_t  CST9217_MAX_POINTS       = 2;
 constexpr size_t   CST9217_REPORT_BYTES     = CST9217_MAX_POINTS * 5 + 5;
+constexpr int16_t  CST9217_COORD_MAX        = 466;
 // The CST9217 repeats its pulsed interrupt about once per second while held.
 // This fallback prevents a lost release report from leaving BambuHelper held
 // forever, while still allowing deliberate long presses.
@@ -29,6 +30,9 @@ bool held = false;
 volatile uint32_t irqCount = 0;
 uint32_t irqSeen = 0;
 unsigned long lastReportMs = 0;
+bool lastPointValid = false;
+int16_t lastPointX = 0;
+int16_t lastPointY = 0;
 
 void IRAM_ATTR cst9217Isr() {
   irqCount++;
@@ -65,7 +69,8 @@ bool probe() {
 // Read and acknowledge one pending report. A successful bus transaction with
 // no active point is a real release; an I2C failure is reported separately so
 // button.cpp can preserve its current debounce/hold state.
-bool readReport(bool& isDown, uint8_t& pointCount) {
+bool readReport(bool& isDown, uint8_t& pointCount,
+                bool& hasPoint, int16_t& screenX, int16_t& screenY) {
   uint8_t report[CST9217_REPORT_BYTES] = {};
   if (!readBytes(CST9217_REPORT_REG, report, sizeof(report))) return false;
 
@@ -78,6 +83,7 @@ bool readReport(bool& isDown, uint8_t& pointCount) {
 
   isDown = false;
   pointCount = 0;
+  hasPoint = false;
   if (report[6] != CST9217_REPORT_ACK) return true;
 
   pointCount = report[5] & 0x7F;
@@ -88,6 +94,23 @@ bool readReport(bool& isDown, uint8_t& pointCount) {
     // is 0x06 only while that finger is present; IDs occupy the high nibble.
     const size_t offset = (i == 0) ? 0 : 7;
     if ((report[offset] & 0x0F) == CST9217_FINGER_DOWN) {
+      const uint16_t rawX = (static_cast<uint16_t>(report[offset + 1]) << 4) |
+                            (report[offset + 3] >> 4);
+      const uint16_t rawY = (static_cast<uint16_t>(report[offset + 2]) << 4) |
+                            (report[offset + 3] & 0x0F);
+
+      // Waveshare's 466x466 example calls setMirrorXY(true, true). SensorLib
+      // implements that as max-coordinate minus the raw coordinate. Clamp the
+      // upper endpoint to BambuHelper's valid framebuffer range (0..465).
+      int16_t mirroredX = CST9217_COORD_MAX - static_cast<int16_t>(rawX);
+      int16_t mirroredY = CST9217_COORD_MAX - static_cast<int16_t>(rawY);
+      if (mirroredX < 0) mirroredX = 0;
+      if (mirroredX >= CST9217_COORD_MAX) mirroredX = CST9217_COORD_MAX - 1;
+      if (mirroredY < 0) mirroredY = 0;
+      if (mirroredY >= CST9217_COORD_MAX) mirroredY = CST9217_COORD_MAX - 1;
+      screenX = mirroredX;
+      screenY = mirroredY;
+      hasPoint = true;
       isDown = true;
       break;
     }
@@ -112,6 +135,9 @@ void touchInit() {
   irqCount = 0;
   irqSeen = 0;
   held = false;
+  lastPointValid = false;
+  lastPointX = 0;
+  lastPointY = 0;
   lastReportMs = millis();
   attachInterrupt(digitalPinToInterrupt(CST9217_IRQ), cst9217Isr, FALLING);
 
@@ -128,23 +154,39 @@ void touchInit() {
 }
 
 TouchPoll touchPoll() {
-  if (!busReady) return {TouchEvent::Unavailable, false};
+  if (!busReady) return {TouchEvent::Unavailable, false, false, 0, 0};
 
   const uint32_t count = irqCount;
   const unsigned long now = millis();
   if (count == irqSeen) {
     if (held && (now - lastReportMs) > CST9217_RELEASE_FALLBACK_MS) {
+      TouchPoll release = {
+        TouchEvent::Released, false, lastPointValid, lastPointX, lastPointY
+      };
       held = false;
-      return {TouchEvent::Released, false};
+      lastPointValid = false;
+      return release;
     }
-    return {TouchEvent::None, held};
+    return {TouchEvent::None, held,
+            held && lastPointValid, lastPointX, lastPointY};
   }
   irqSeen = count;
 
   bool down = false;
   uint8_t points = 0;
-  if (!readReport(down, points)) return {TouchEvent::Unavailable, false};
+  bool hasPoint = false;
+  int16_t pointX = 0;
+  int16_t pointY = 0;
+  if (!readReport(down, points, hasPoint, pointX, pointY)) {
+    return {TouchEvent::Unavailable, false, false, 0, 0};
+  }
   lastReportMs = now;
+
+  if (hasPoint) {
+    lastPointValid = true;
+    lastPointX = pointX;
+    lastPointY = pointY;
+  }
 
   if (!seen) {
     Serial.printf("CST9217 touch became responsive at runtime (addr 0x%02X)\n",
@@ -154,13 +196,19 @@ TouchPoll touchPoll() {
 
   if (down && !held) {
     held = true;
-    return {TouchEvent::Pressed, true};
+    return {TouchEvent::Pressed, true,
+            lastPointValid, lastPointX, lastPointY};
   }
   if (!down && held) {
+    TouchPoll release = {
+      TouchEvent::Released, false, lastPointValid, lastPointX, lastPointY
+    };
     held = false;
-    return {TouchEvent::Released, false};
+    lastPointValid = false;
+    return release;
   }
-  return {TouchEvent::None, held};
+  return {TouchEvent::None, held,
+          held && lastPointValid, lastPointX, lastPointY};
 }
 
 #endif  // USE_CST9217

@@ -12,6 +12,71 @@ static bool stableState = false;
 static unsigned long lastChangeMs = 0;
 static unsigned long pressStartMs = 0;
 static const unsigned long DEBOUNCE_MS = 50;
+static const int16_t TOUCH_SWIPE_MIN_PX = 64;
+static const int16_t TOUCH_SWIPE_AXIS_MARGIN_PX = 24;
+
+static bool gestureTracking = false;
+static bool gestureHasPoint = false;
+static int16_t gestureStartX = 0;
+static int16_t gestureStartY = 0;
+static int16_t gestureLastX = 0;
+static int16_t gestureLastY = 0;
+static uint32_t gestureStartMs = 0;
+static TouchGesture pendingGesture = {
+  TouchGestureType::None, 0, 0, 0, 0, 0
+};
+
+static void resetGestureTracking() {
+  gestureTracking = false;
+  gestureHasPoint = false;
+  gestureStartX = 0;
+  gestureStartY = 0;
+  gestureLastX = 0;
+  gestureLastY = 0;
+  gestureStartMs = 0;
+}
+
+static void beginGesture(const TouchPoll& tp) {
+  resetGestureTracking();
+  if (!tp.hasPoint) return;
+  gestureTracking = true;
+  gestureHasPoint = true;
+  gestureStartX = gestureLastX = tp.x;
+  gestureStartY = gestureLastY = tp.y;
+  gestureStartMs = millis();
+}
+
+static void updateGesturePoint(const TouchPoll& tp) {
+  if (!gestureTracking || !tp.hasPoint) return;
+  gestureHasPoint = true;
+  gestureLastX = tp.x;
+  gestureLastY = tp.y;
+}
+
+static void finishGesture(const TouchPoll& tp) {
+  if (!gestureTracking || !gestureHasPoint) {
+    resetGestureTracking();
+    return;
+  }
+  updateGesturePoint(tp);
+  const int16_t dx = gestureLastX - gestureStartX;
+  const int16_t dy = gestureLastY - gestureStartY;
+  const int16_t absDx = (dx < 0) ? -dx : dx;
+  const int16_t absDy = (dy < 0) ? -dy : dy;
+
+  TouchGestureType type = TouchGestureType::Tap;
+  if (absDx >= TOUCH_SWIPE_MIN_PX &&
+      absDx >= absDy + TOUCH_SWIPE_AXIS_MARGIN_PX) {
+    type = (dx < 0) ? TouchGestureType::SwipeLeft
+                    : TouchGestureType::SwipeRight;
+  }
+
+  pendingGesture = {
+    type, gestureStartX, gestureStartY, dx, dy,
+    gestureStartMs == 0 ? 0 : static_cast<uint32_t>(millis() - gestureStartMs)
+  };
+  resetGestureTracking();
+}
 
 void sanitizeButtonPin() {
   // Only the GPIO-backed button types use buttonPin. Touchscreen talks over
@@ -186,6 +251,13 @@ void sanitizeButtonPin() {
 }
 
 void initButton() {
+  lastRaw = false;
+  stableState = false;
+  lastChangeMs = 0;
+  pressStartMs = 0;
+  pendingGesture = {TouchGestureType::None, 0, 0, 0, 0, 0};
+  resetGestureTracking();
+
   if (buttonType == BTN_DISABLED) return;
   sanitizeButtonPin();
   if (buttonType == BTN_TOUCHSCREEN) {
@@ -198,10 +270,6 @@ void initButton() {
   } else {  // BTN_TOUCH (TTP223)
     pinMode(buttonPin, INPUT);
   }
-  lastRaw = false;
-  stableState = false;
-  lastChangeMs = 0;
-  pressStartMs = 0;
 }
 
 bool wasButtonPressed() {
@@ -218,11 +286,13 @@ bool wasButtonPressed() {
     // debounce. Level backends only ever report None, so they fall through
     // to the shared debouncer below.
     if (tp.ev == TouchEvent::Pressed) {
+      beginGesture(tp);
       stableState = true;
       pressStartMs = millis();
       return true;
     }
     if (tp.ev == TouchEvent::Released) {
+      finishGesture(tp);
       stableState = false;
       pressStartMs = 0;
       return false;
@@ -231,6 +301,7 @@ bool wasButtonPressed() {
     // edge-managed backend isDown mirrors its held state, so the debouncer
     // never sees a false->true edge it hasn't already reported as Pressed.)
     raw = tp.isDown;
+    updateGesturePoint(tp);
   } else if (buttonType == BTN_PUSH) {
     if (buttonPin == 0) return false;
     raw = (digitalRead(buttonPin) == LOW);   // active LOW with pull-up
@@ -266,4 +337,10 @@ bool isButtonHeld() {
 uint32_t buttonHoldDurationMs() {
   if (!stableState || pressStartMs == 0) return 0;
   return (uint32_t)(millis() - pressStartMs);
+}
+
+TouchGesture takeTouchGesture() {
+  TouchGesture result = pendingGesture;
+  pendingGesture = {TouchGestureType::None, 0, 0, 0, 0, 0};
+  return result;
 }

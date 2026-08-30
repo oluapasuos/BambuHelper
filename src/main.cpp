@@ -141,10 +141,13 @@ static bool handleSplashPhase() {
   return false;
 }
 
-static void cycleDisplayedPrinterFromButton() {
+static void cycleDisplayedPrinter(int8_t direction) {
   uint8_t idx = rotState.displayIndex;
   for (uint8_t a = 1; a <= MAX_ACTIVE_PRINTERS; a++) {
-    uint8_t next = (idx + a) % MAX_ACTIVE_PRINTERS;
+    int16_t candidate = static_cast<int16_t>(idx) +
+                        static_cast<int16_t>(direction) * a;
+    while (candidate < 0) candidate += MAX_ACTIVE_PRINTERS;
+    uint8_t next = static_cast<uint8_t>(candidate % MAX_ACTIVE_PRINTERS);
     if (isPrinterConfigured(next) && next != idx) {
       rotState.displayIndex = next;
       triggerDisplayTransition();
@@ -159,6 +162,10 @@ static void cycleDisplayedPrinterFromButton() {
       break;
     }
   }
+}
+
+static void cycleDisplayedPrinterFromButton() {
+  cycleDisplayedPrinter(1);
 }
 
 static bool wasBoardButtonPressed() {
@@ -424,6 +431,61 @@ static void registerTap() {
   pcLastTapMs = now;
 }
 
+#if defined(USE_CST9217) && defined(DISPLAY_466x466)
+static bool touchHitsErrorBadge(const TouchGesture& gesture) {
+  // Header badge anchor is x=362, y=54 in layout_466x466.h. Keep a generous
+  // finger-sized rectangle around both its dot and the ERR text.
+  return gesture.x >= 280 && gesture.x <= 400 &&
+         gesture.y >= 18 && gesture.y <= 96;
+}
+
+static void leaveContextScreenForSwipe() {
+  ScreenState cur = getScreenState();
+  if (cur == SCREEN_HMS) {
+    closeHmsScreen();
+  } else if (cur == SCREEN_DRY_PEEK) {
+    closeDryPeek();
+#if BOARD_HAS_CAMERA
+  } else if (cur == SCREEN_CAMERA) {
+    setScreenState(SCREEN_PRINTING);
+#endif
+  }
+}
+
+static void dispatchCst9217Gesture(const TouchGesture& gesture) {
+  const char* label = "TAP";
+  if (gesture.type == TouchGestureType::SwipeLeft) label = "SWIPE_LEFT";
+  if (gesture.type == TouchGestureType::SwipeRight) label = "SWIPE_RIGHT";
+  Serial.printf("Touch gesture: %s x=%d y=%d dx=%d dy=%d ms=%lu\n",
+                label, gesture.x, gesture.y,
+                gesture.deltaX, gesture.deltaY,
+                static_cast<unsigned long>(gesture.durationMs));
+
+  if (gesture.type == TouchGestureType::Tap) {
+    ScreenState cur = getScreenState();
+    if ((cur == SCREEN_PRINTING || cur == SCREEN_IDLE || cur == SCREEN_FINISHED) &&
+        touchHitsErrorBadge(gesture) && hmsScreenAlerting() &&
+        openHmsScreen(HMS_SCREEN_MS)) {
+      return;
+    }
+    registerTap();
+    return;
+  }
+
+  if (gesture.type == TouchGestureType::SwipeLeft ||
+      gesture.type == TouchGestureType::SwipeRight) {
+    // A swipe from the clock also wakes the display before changing slot.
+    if (isSleepStickyScreen(getScreenState())) doTapActions();
+    leaveContextScreenForSwipe();
+    if (getActiveConnCount() >= 2) {
+      cycleDisplayedPrinter(
+        gesture.type == TouchGestureType::SwipeLeft ? 1 : -1
+      );
+    }
+  }
+}
+#endif
+
 // Modal input state machine. Called every loop while SCREEN_POWER_CONFIRM is up.
 static void handlePowerConfirmInput(bool held) {
   uint32_t now = millis();
@@ -480,6 +542,7 @@ static void handleWakeButton() {
   // own debounce + held-state machine, and skipping a call would freeze it.
   bool touchPress = wasButtonPressed();
   bool boardPress = wasBoardButtonPressed();
+  TouchGesture touchGesture = takeTouchGesture();
 
   // Any press acknowledges the edge glow on the raw edge, before tap/hold
   // decoding - the press still performs its normal action below. Armed, not
@@ -530,6 +593,27 @@ static void handleWakeButton() {
 
   // Tick the dimmer every loop regardless of state - it owns the 2 s save debounce.
   bool holdConsumed = ledHoldDimUpdate(held, holdMs, suppressDim);
+
+#if defined(USE_CST9217) && defined(DISPLAY_466x466)
+  // This coordinate-capable panel must wait for release before deciding
+  // between tap and swipe. Other touch backends keep the existing press-edge
+  // path below. Board buttons remain independent and retain their old action.
+  if (buttonType == BTN_TOUCHSCREEN) {
+    if (touchPress) {
+      buzzerPlayClick();
+      ledOnUserInteraction();
+    }
+    if (touchGesture.type != TouchGestureType::None) {
+      dispatchCst9217Gesture(touchGesture);
+    }
+    if (boardPress) {
+      buzzerPlayClick();
+      ledOnUserInteraction();
+      registerTap();
+    }
+    return;
+  }
+#endif
 
   // LED disabled or unconfigured: take the ORIGINAL press-edge path (with the new
   // multi-click shim). The dimmer's entry guard prevents any dim session, so

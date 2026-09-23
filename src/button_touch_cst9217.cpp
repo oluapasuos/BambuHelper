@@ -10,6 +10,8 @@
 
 #include <Wire.h>
 
+#include "settings.h"
+
 namespace {
 
 constexpr uint8_t  CST9217_ADDR             = 0x5A;
@@ -33,6 +35,32 @@ unsigned long lastReportMs = 0;
 bool lastPointValid = false;
 int16_t lastPointX = 0;
 int16_t lastPointY = 0;
+
+// Convert native panel coordinates into the logical orientation used by the
+// framebuffer. The CO5300 panel itself remains at rotation 0; LovyanGFX rotates
+// the 466x466 sprite, so touch coordinates must apply the inverse mapping.
+void applyDisplayRotation(int16_t nativeX, int16_t nativeY,
+                          int16_t& screenX, int16_t& screenY) {
+  constexpr int16_t LAST = CST9217_COORD_MAX - 1;
+  switch (dispSettings.rotation & 0x03) {
+    case 1:  // 90 degrees clockwise
+      screenX = nativeY;
+      screenY = LAST - nativeX;
+      break;
+    case 2:  // 180 degrees
+      screenX = LAST - nativeX;
+      screenY = LAST - nativeY;
+      break;
+    case 3:  // 270 degrees clockwise
+      screenX = LAST - nativeY;
+      screenY = nativeX;
+      break;
+    default:
+      screenX = nativeX;
+      screenY = nativeY;
+      break;
+  }
+}
 
 void IRAM_ATTR cst9217Isr() {
   irqCount++;
@@ -108,8 +136,7 @@ bool readReport(bool& isDown, uint8_t& pointCount,
       if (mirroredX >= CST9217_COORD_MAX) mirroredX = CST9217_COORD_MAX - 1;
       if (mirroredY < 0) mirroredY = 0;
       if (mirroredY >= CST9217_COORD_MAX) mirroredY = CST9217_COORD_MAX - 1;
-      screenX = mirroredX;
-      screenY = mirroredY;
+      applyDisplayRotation(mirroredX, mirroredY, screenX, screenY);
       hasPoint = true;
       isDown = true;
       break;

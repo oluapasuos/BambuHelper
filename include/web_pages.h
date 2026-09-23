@@ -450,6 +450,13 @@ R"rawliteral(
         <option value="3" %ROT3%>270&deg;</option>
       </select>
     </div>
+    <div class="field" style="%ROTTRIM_STYLE%">
+      <label for="rottrim">Fine alignment</label>
+      <div class="hstack" style="gap:var(--sp-2)">
+        <input type="number" id="rottrim" min="-3" max="3" step="0.5" value="%ROTTRIM%" style="max-width:100px">
+        <span class="text-dim small">degrees; negative turns counterclockwise</span>
+      </div>
+    </div>
     <label class="check-row">
       <input type="checkbox" id="abar" value="1" %ABAR% onchange="toggleSetting('abar',this.checked)">
       <label for="abar">Animated progress bar (shimmer effect)</label>

@@ -197,6 +197,7 @@ static constexpr uint16_t AMO_HEATBREAK_L = 0x5F3B; // #5DE5D8
 
 void defaultDisplaySettings(DisplaySettings& ds) {
   ds.rotation = 0;
+  ds.fineRotationTenths = 0;
   ds.bgColor = CLR_BG;
   ds.trackColor = CLR_TRACK;
   ds.progressBarColor = CLR_GREEN;
@@ -597,6 +598,10 @@ void loadSettings() {
   defaultDisplaySettings(def);
 
   dispSettings.rotation = prefs.getUChar("dsp_rot", def.rotation);
+  dispSettings.fineRotationTenths = prefs.getShort("dsp_rtrim", def.fineRotationTenths);
+  if (dispSettings.fineRotationTenths < -30 || dispSettings.fineRotationTenths > 30) {
+    dispSettings.fineRotationTenths = 0;
+  }
   dispSettings.bgColor = prefs.getUShort("dsp_bg", def.bgColor);
   dispSettings.trackColor = prefs.getUShort("dsp_trk", def.trackColor);
   dispSettings.animatedBar = prefs.getBool("dsp_abar", def.animatedBar);
@@ -1015,6 +1020,7 @@ void saveSettings() {
 
   // Display settings
   prefs.putUChar("dsp_rot", dispSettings.rotation);
+  prefs.putShort("dsp_rtrim", dispSettings.fineRotationTenths);
   prefs.putUShort("dsp_bg", dispSettings.bgColor);
   prefs.putUShort("dsp_trk", dispSettings.trackColor);
   prefs.putUShort("dsp_pbar", dispSettings.progressBarColor);

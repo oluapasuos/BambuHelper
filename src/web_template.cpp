@@ -147,6 +147,18 @@ static bool resolvePlaceholder(const char* name, String& out) {
     out = dispSettings.rotation == (name[3] - '0') ? "selected" : "";
     return true;
   }
+  if (strcmp(name, "ROTTRIM") == 0) {
+    out = String(dispSettings.fineRotationTenths / 10.0f, 1);
+    return true;
+  }
+  if (strcmp(name, "ROTTRIM_STYLE") == 0) {
+#if defined(BOARD_IS_WS_AMOLED_175)
+    out = "";
+#else
+    out = "display:none";
+#endif
+    return true;
+  }
 
   // --- After-print ---
   {

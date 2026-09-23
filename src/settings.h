@@ -67,6 +67,7 @@ struct GaugeColors {
 // All display customization settings
 struct DisplaySettings {
   uint8_t  rotation;       // 0, 1, 2, 3 (x90 degrees)
+  int16_t  fineRotationTenths; // software alignment trim in 0.1 degrees (-30..30)
   uint16_t bgColor;        // background color
   uint16_t trackColor;     // inactive arc track color
   uint16_t progressBarColor; // top LED progress bar fill color (independent of Progress gauge arc)

@@ -89,6 +89,11 @@ static void readDisplayFromForm() {
     uint8_t rot = server.arg("rotation").toInt();
     if (rot <= 3) dispSettings.rotation = rot;
   }
+  if (server.hasArg("rottrim")) {
+    float degrees = server.arg("rottrim").toFloat();
+    dispSettings.fineRotationTenths =
+        (int16_t)constrain((int)lroundf(degrees * 10.0f), -30, 30);
+  }
   if (server.hasArg("clr_bg"))    dispSettings.bgColor = htmlToRgb565(server.arg("clr_bg").c_str());
   if (server.hasArg("clr_track")) dispSettings.trackColor = htmlToRgb565(server.arg("clr_track").c_str());
   if (server.hasArg("clr_pbar"))  dispSettings.progressBarColor = htmlToRgb565(server.arg("clr_pbar").c_str());
@@ -1621,6 +1626,7 @@ static void handleSettingsExport() {
   JsonObject disp = doc["display"].to<JsonObject>();
   disp["brightness"] = brightness;
   disp["rotation"] = dispSettings.rotation;
+  disp["fineRotationTenths"] = dispSettings.fineRotationTenths;
   rgb565ToHtml(dispSettings.bgColor, buf);    disp["bgColor"] = String(buf);
   rgb565ToHtml(dispSettings.trackColor, buf); disp["trackColor"] = String(buf);
   rgb565ToHtml(dispSettings.progressBarColor, buf); disp["progressBarColor"] = String(buf);
@@ -1987,6 +1993,10 @@ static void handleSettingsImportFinish() {
   if (disp) {
     if (disp["brightness"].is<uint8_t>()) brightness = disp["brightness"].as<uint8_t>();
     if (disp["rotation"].is<uint8_t>())   dispSettings.rotation = disp["rotation"].as<uint8_t>();
+    if (disp["fineRotationTenths"].is<int16_t>()) {
+      dispSettings.fineRotationTenths =
+          constrain(disp["fineRotationTenths"].as<int>(), -30, 30);
+    }
     if (disp["bgColor"].is<const char*>())    dispSettings.bgColor = htmlToRgb565(disp["bgColor"]);
     if (disp["trackColor"].is<const char*>()) dispSettings.trackColor = htmlToRgb565(disp["trackColor"]);
     if (disp["progressBarColor"].is<const char*>()) dispSettings.progressBarColor = htmlToRgb565(disp["progressBarColor"]);

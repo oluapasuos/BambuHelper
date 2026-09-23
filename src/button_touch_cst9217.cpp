@@ -36,6 +36,29 @@ bool lastPointValid = false;
 int16_t lastPointX = 0;
 int16_t lastPointY = 0;
 
+// Undo the final sub-degree framebuffer trim before applying the cardinal
+// display rotation. This keeps hit zones under the pixels the user sees.
+void undoFineRotation(int16_t physicalX, int16_t physicalY,
+                      int16_t& nativeX, int16_t& nativeY) {
+  const int16_t trimTenths = dispSettings.fineRotationTenths;
+  if (trimTenths == 0) {
+    nativeX = physicalX;
+    nativeY = physicalY;
+    return;
+  }
+
+  constexpr float CENTRE = (CST9217_COORD_MAX - 1) * 0.5f;
+  const float radians = trimTenths * (3.14159265358979323846f / 1800.0f);
+  const float c = cosf(radians);
+  const float s = sinf(radians);
+  const float dx = physicalX - CENTRE;
+  const float dy = physicalY - CENTRE;
+  nativeX = (int16_t)lroundf(CENTRE + c * dx + s * dy);
+  nativeY = (int16_t)lroundf(CENTRE - s * dx + c * dy);
+  nativeX = constrain(nativeX, 0, CST9217_COORD_MAX - 1);
+  nativeY = constrain(nativeY, 0, CST9217_COORD_MAX - 1);
+}
+
 // Convert native panel coordinates into the logical orientation used by the
 // framebuffer. The CO5300 panel itself remains at rotation 0; LovyanGFX rotates
 // the 466x466 sprite, so touch coordinates must apply the inverse mapping.
@@ -136,7 +159,10 @@ bool readReport(bool& isDown, uint8_t& pointCount,
       if (mirroredX >= CST9217_COORD_MAX) mirroredX = CST9217_COORD_MAX - 1;
       if (mirroredY < 0) mirroredY = 0;
       if (mirroredY >= CST9217_COORD_MAX) mirroredY = CST9217_COORD_MAX - 1;
-      applyDisplayRotation(mirroredX, mirroredY, screenX, screenY);
+      int16_t nativeX = 0;
+      int16_t nativeY = 0;
+      undoFineRotation(mirroredX, mirroredY, nativeX, nativeY);
+      applyDisplayRotation(nativeX, nativeY, screenX, screenY);
       hasPoint = true;
       isDown = true;
       break;

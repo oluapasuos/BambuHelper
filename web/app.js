@@ -1137,6 +1137,8 @@ function applyDisplay(){
   p.append('nbright', document.getElementById('nbright').value);
   p.append('ssbright', document.getElementById('ssbright').value);
   p.append('rotation', document.getElementById('rotation').value);
+  var rottrim = document.getElementById('rottrim');
+  if (rottrim) p.append('rottrim', rottrim.value);
   var ap = document.getElementById('afterprint').value;
   var afClock = document.getElementById('afterfin').value !== 'off';
   if (ap === 'keepon') { p.append('keepon', '1'); p.append('fmins', '0'); }

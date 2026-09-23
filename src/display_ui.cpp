@@ -126,6 +126,13 @@ lgfx::Panel_CO5300_AGFX* g_co5300_panel = _tft_instance.panelCO5300();
 // then the complete frame is pushed to the Arduino_GFX panel.
 static lgfx::LGFX_Sprite _frame_sprite(&_tft_instance);
 
+#if PANEL_REQUIRES_CO5300_FRAME_SPRITE
+// Optional second full-frame buffer used only for sub-degree alignment trim.
+// Keeping the original sprite untouched lets every existing drawer retain its
+// cardinal rotation while flushFrame() applies the final physical correction.
+static lgfx::LGFX_Sprite _fine_rotation_sprite(&_tft_instance);
+#endif
+
 static bool g_frame_dirty = true;
 static unsigned long g_last_flush_ms = 0;
 static const unsigned long FRAME_KEEPALIVE_MS = 500;
@@ -160,8 +167,47 @@ void flushFrame() {
 
     if (!g_co5300_panel) return;
 
+    uint16_t* pixels = static_cast<uint16_t*>(_frame_sprite.getBuffer());
+    const int16_t trimTenths = dispSettings.fineRotationTenths;
+    if (trimTenths != 0 && _fine_rotation_sprite.getBuffer()) {
+      constexpr int32_t SIZE = 466;
+      constexpr int32_t ONE = 1 << 16;
+      // The centre lies between the four central pixels: 232.5 in Q16.
+      constexpr int32_t CENTRE = ((SIZE - 1) * ONE) / 2;
+      const float radians = trimTenths * (3.14159265358979323846f / 1800.0f);
+      const int32_t cosQ = (int32_t)lroundf(cosf(radians) * ONE);
+      const int32_t sinQ = (int32_t)lroundf(sinf(radians) * ONE);
+
+      _fine_rotation_sprite.fillSprite(dispSettings.bgColor);
+      uint16_t* rotated =
+          static_cast<uint16_t*>(_fine_rotation_sprite.getBuffer());
+
+      // Inverse-map each destination pixel to the nearest source pixel. This
+      // preserves the crisp RGB565 glyphs instead of softening every small
+      // readout through a full-frame bilinear pass.
+      const int32_t firstDx = -CENTRE;
+      for (int32_t y = 0; y < SIZE; y++) {
+        const int32_t dy = y * ONE - CENTRE;
+        int32_t srcX = CENTRE +
+            (int32_t)(((int64_t)cosQ * firstDx + (int64_t)sinQ * dy) >> 16);
+        int32_t srcY = CENTRE +
+            (int32_t)((-(int64_t)sinQ * firstDx + (int64_t)cosQ * dy) >> 16);
+        uint16_t* dstRow = rotated + y * SIZE;
+        for (int32_t x = 0; x < SIZE; x++) {
+          const int32_t sx = (srcX + (ONE >> 1)) >> 16;
+          const int32_t sy = (srcY + (ONE >> 1)) >> 16;
+          if ((uint32_t)sx < SIZE && (uint32_t)sy < SIZE) {
+            dstRow[x] = pixels[sy * SIZE + sx];
+          }
+          srcX += cosQ;
+          srcY -= sinQ;
+        }
+      }
+      pixels = rotated;
+    }
+
     g_co5300_panel->pushRawPixels(
-        static_cast<uint16_t*>(_frame_sprite.getBuffer()),
+        pixels,
         466u * 466u
     );
 
@@ -542,6 +588,17 @@ void initDisplay() {
 
         tft.setRotation(sanitizeRotation(dispSettings.rotation));
         tft.fillScreen(CLR_BG);
+
+#if PANEL_REQUIRES_CO5300_FRAME_SPRITE
+        _fine_rotation_sprite.setPsram(true);
+        _fine_rotation_sprite.setColorDepth(16);
+        if (_fine_rotation_sprite.createSprite(frameW, frameH)) {
+          _fine_rotation_sprite.fillSprite(CLR_BG);
+          Serial.println("Display: fine-rotation framebuffer allocated in PSRAM");
+        } else {
+          Serial.println("Display: fine-rotation framebuffer alloc FAILED; trim disabled");
+        }
+#endif
 
         flushFrame();
 

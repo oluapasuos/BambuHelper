@@ -140,6 +140,17 @@ static int16_t g_last_fine_rotation_tenths = 0;
 static inline uint16_t bilinear565(uint16_t p00, uint16_t p10,
                                    uint16_t p01, uint16_t p11,
                                    uint32_t fx, uint32_t fy) {
+  // LGFX stores 16-bit sprite pixels byte-swapped in memory. Nearest-neighbour
+  // copying can treat them as opaque words, but component interpolation must
+  // first restore logical RGB565 order and swap the blended result back.
+  auto toLogical565 = [](uint16_t p) -> uint16_t {
+    return (uint16_t)((p << 8) | (p >> 8));
+  };
+  p00 = toLogical565(p00);
+  p10 = toLogical565(p10);
+  p01 = toLogical565(p01);
+  p11 = toLogical565(p11);
+
   const uint32_t ix = 256u - fx;
   const uint32_t iy = 256u - fy;
   const uint32_t w00 = ix * iy;
@@ -160,7 +171,7 @@ static inline uint16_t bilinear565(uint16_t p00, uint16_t p10,
                       + (p01 & 0x1Fu) * w01
                       + (p11 & 0x1Fu) * w11) + 32768u) >> 16;
 
-  return (uint16_t)((r << 11) | (g << 5) | b);
+  return toLogical565((uint16_t)((r << 11) | (g << 5) | b));
 }
 #endif
 
